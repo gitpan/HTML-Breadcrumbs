@@ -1,8 +1,0 @@
-Changelog
-=========
-
-0.03  19 March 2003
-      - first public release, including procedural and OO interfaces and
-        support for the following args:
-          path, roots, indexes, omit, labels, sep, format, format_last
-

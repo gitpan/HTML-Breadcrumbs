@@ -7,11 +7,12 @@ use HTML::Breadcrumbs qw(breadcrumbs);
 # Load result strings
 my $test = 't1';
 my %result = ();
-die "missing data dir t/$test" unless -d "t/$test";
-opendir DATADIR, "t/$test" or die "can't open t/$test";
+$test = "t/$test" if -d "t/$test";
+die "missing data dir $test" unless -d $test;
+opendir DATADIR, "$test" or die "can't open $test";
 for (readdir DATADIR) {
   next if m/^\./;
-  open FILE, "<t/$test/$_" or die "can't read t/$test/$_";
+  open FILE, "<$test/$_" or die "can't read $test/$_";
   $result{$_} = <FILE>;
   chomp $result{$_};
   close FILE;

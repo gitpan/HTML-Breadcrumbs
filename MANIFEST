@@ -1,7 +1,7 @@
 Breadcrumbs.pm
 Changes
-Makefile.PL
 MANIFEST
+Makefile.PL
 README
 t/1_base.t
 t/2_roots_indexes.t
@@ -18,8 +18,13 @@ t/t2/bar
 t/t2/bar2
 t/t2/bog
 t/t2/foo
+t/t3/bar
 t/t3/cgi
 t/t3/foo
+t/t3/foon
+t/t3/n123
+t/t3/n678
+t/t3/n678full
 t/t4/bar
 t/t4/bog
 t/t4/bog2

@@ -1,5 +1,3 @@
-# tag: HTML Breadcrumb class
-
 package HTML::Breadcrumbs;
 
 use 5.000;
@@ -9,13 +7,13 @@ use strict;
 require Exporter;
 
 use vars qw($VERSION @ISA @EXPORT @EXPORT_OK);
-$VERSION = '0.03';
+$VERSION = '0.04';
 @ISA = qw(Exporter);
 @EXPORT = ();
 @EXPORT_OK = qw(breadcrumbs);
 
 # my @ARG = qw(path roots indexes omit map labels sep format format_last extra);
-my @ARG = qw(path roots indexes omit labels sep format format_last extra);
+my @ARG = qw(path roots indexes omit omit_regex labels sep format format_last extra);
 
 #
 # Initialise
@@ -38,7 +36,7 @@ sub init
     my %ARG = map { $_ => 1 } @ARG;
     my @bad = grep { ! exists $ARG{$_} } keys %arg;
     croak "[Breadcrumbs::init] invalid argument(s): " . join(',',@bad) if @bad;
-    croak "[Breadcrumbs::render] 'path' argument must be absolute" 
+    croak "[Breadcrumbs::init] 'path' argument must be absolute" 
         if $self->{path} && substr($self->{path},0,1) ne '/';
 
     # Add arguments to $self
@@ -82,16 +80,46 @@ sub split
     my %omit = ();
     if ($self->{omit} && ref $self->{omit} eq 'ARRAY') {
         for (@{$self->{omit}}) {
-            # Omit strings should begin and end with '/'
-            $_ = '/' . $_ unless substr($_,0,1) eq '/';
-            $_ .= '/' unless substr($_,-1) eq '/';
+            # Omit strings should be either absolute paths or just the final elt
+            if (substr($_,0,1) eq '/') {
+                # Absolute paths should also end in '/'
+                $_ .= '/' unless substr($_,-1) eq '/';
+            } elsif (m!/!) {
+                carp "[Breadcrumbs::split] omit arguments must be either absolute paths or just the final path element - skipping $_";
+                next;
+            }
             $omit{$_} = 1;
         }
     }
     my $current = $root;
-    while ($self->{path} =~ m|^$current.*?([^/]+/?)|) {
+    my $omit_regex = $self->{omit_regex} || [];
+    $omit_regex = [ $omit_regex ] unless ref $omit_regex eq 'ARRAY';
+    # Create seperate full-path and element omit_regex arrays
+    my $omit_regex_elt = [];
+    my $omit_regex_path = [];
+    for my $o (@$omit_regex) {
+        if ($o =~ m!/!) {
+            $o =~ s!^\^!!;
+            $o =~ s!/*(\$)?$!!;  #!
+            push @$omit_regex_path, qq(^$o/\$);
+        }
+        else {
+            push @$omit_regex_elt, $o;
+        }
+    }
+
+    # Add path elements to elt array
+    while ($self->{path} =~ m|^$current.*?(([^/]+)/?)|) {
+        my $final = $2;
         $current .= $1;
-        push @{$self->{elt}}, $current unless $omit{$current};
+        # Ignore elements explicitly omitted
+        next if $omit{$current} || $omit{$final};
+        # Ignore elements matching omit_regex_elt patterns
+        next if grep { $final =~ m/$_/ } @$omit_regex_elt;
+        # Ignore paths matching omit_regex_path patterns
+        next if grep { $current =~ m/$_/ } @$omit_regex_path;
+        # Otherwise add to elt array
+        push @{$self->{elt}}, $current;
     }
 
     # Check the final element for indexes
@@ -433,12 +461,33 @@ probably also be included here. Default: [ 'index.html' ].
 
 =item *
 
-L<omit|omit> - an arrayref of fully-qualified elements (paths) 
-indicating individual elements to be omitted or skipped when 
-producing breadcrumbs. For example, if the omit arrayref contains 
-'/cgi-bin' then a path of '/cgi-bin/forms/help.html' would be 
-rendered as "Home > Forms > Help" instead of the default 
-"Home > cgi-bin > Forms > Help". Default: none.
+L<omit|omit> - a scalar or arrayref of elements to be omitted or 
+skipped when producing breadcrumbs. Omit arguments should be either
+bare element names (i.e. contain no '/' characters, e.g. 'forms') or 
+full absolute paths (i.e. begin with a '/', e.g. '/cgi-bin/forms') . 
+For example, if omit includes 'cgi-bin', then a path of 
+'/cgi-bin/forms/help.html' would be rendered as "Home > Forms > Help" 
+instead of the default "Home > cgi-bin > Forms > Help". Default: none.
+
+=item *
+
+L<omit_regex|omit_regex> - a scalar or arrayref of regular expressions
+used to match elements to be omitted when producing breadcrumbs.
+Like 'omit', regexes should match either bare element names (no '/'
+characters, e.g. 'forms') or full absolute paths (beginning with '/',
+e.g. '/cgi-bin/forms'). WARNING: absolute paths are always explicitly
+anchored at both ends (i.e. '/cgi-bin/forms' is used as 
+m!^/cgi-bin/forms/$!), since otherwise the pattern matches every path 
+after an initial match.
+
+For example, a path like "/product/12/sample" will be rendered as
+"Home > Product > Sample" instead of the default 
+"Home > Product > 12 > Sample" using any of the following omit_regex 
+patterns: '\d+', '/product/\d+', '/product/[^/]+', etc. Note that
+partial full-path matches like '/product/1' will NOT cause the '12'
+element to be omitted, however.
+
+Default: none.
 
 =item *
 
@@ -536,3 +585,6 @@ This program is free software. You may copy or redistribute it under the
 same terms as perl itself.
 
 =cut
+
+# arch-tag: 0e040afb-30be-467f-9693-f9e16bbfe20f
+
