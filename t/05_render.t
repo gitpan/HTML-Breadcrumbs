@@ -5,7 +5,7 @@ BEGIN { plan tests => 6 };
 use HTML::Breadcrumbs qw(breadcrumbs);
 
 # Load result strings
-my $test = 't5';
+my $test = 't05';
 my %result = ();
 $test = "t/$test" if -d "t/$test";
 die "missing data dir $test" unless -d "$test";

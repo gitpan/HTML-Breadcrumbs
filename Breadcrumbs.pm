@@ -7,13 +7,12 @@ use strict;
 require Exporter;
 
 use vars qw($VERSION @ISA @EXPORT @EXPORT_OK);
-$VERSION = '0.04';
+$VERSION = '0.05';
 @ISA = qw(Exporter);
 @EXPORT = ();
 @EXPORT_OK = qw(breadcrumbs);
 
-# my @ARG = qw(path roots indexes omit map labels sep format format_last extra);
-my @ARG = qw(path roots indexes omit omit_regex labels sep format format_last extra);
+my @ARG = qw(path roots indexes omit omit_regex map labels sep format format_last extra);
 
 #
 # Initialise
@@ -53,15 +52,11 @@ sub new
     return $self->init(@_);
 }
 
-#
-# Split the path into elements (stored in $self->{elt} arrayref)
-#
-sub split
+# Identify the root element
+sub setup_root
 {
     my $self = shift;
 
-    # Identify the root
-    $self->{elt} = [];
     $self->{roots} = [ $self->{roots} ] if $self->{roots} && ! ref $self->{roots};
     my $root = '/';
     for my $r (sort { length($b) <=> length($a) } @{$self->{roots}}) {
@@ -72,57 +67,103 @@ sub split
         }
     }
     push @{$self->{elt}}, $root;
+    $self->{root} = $root;
+}
 
-    # Add elements
+# Setup omit stuff (omit hash, omit_regex arrayrefs)
+sub setup_omit
+{
+    my $self = shift;
+
+    $self->{omit_elt} = {};
+    $self->{omit_regex_elt} = [];
+    $self->{omit_regex_path} = [];
+
     $self->{omit} = [ $self->{omit} ] 
         if $self->{omit} && ! ref $self->{omit};
     # Create a hash from omit elements
-    my %omit = ();
     if ($self->{omit} && ref $self->{omit} eq 'ARRAY') {
         for (@{$self->{omit}}) {
-            # Omit strings should be either absolute paths or just the final elt
+            # Omit elements should be either absolute paths or element basenames
             if (substr($_,0,1) eq '/') {
                 # Absolute paths should also end in '/'
                 $_ .= '/' unless substr($_,-1) eq '/';
             } elsif (m!/!) {
-                carp "[Breadcrumbs::split] omit arguments must be either absolute paths or just the final path element - skipping $_";
+                warn "omit arguments must be either absolute paths or simple path basenames - skipping $_";
                 next;
             }
-            $omit{$_} = 1;
+            $self->{omit_elt}->{$_} = 1;
         }
     }
-    my $current = $root;
     my $omit_regex = $self->{omit_regex} || [];
     $omit_regex = [ $omit_regex ] unless ref $omit_regex eq 'ARRAY';
     # Create seperate full-path and element omit_regex arrays
-    my $omit_regex_elt = [];
-    my $omit_regex_path = [];
     for my $o (@$omit_regex) {
         if ($o =~ m!/!) {
             $o =~ s!^\^!!;
             $o =~ s!/*(\$)?$!!;  #!
-            push @$omit_regex_path, qq(^$o/\$);
+            push @{$self->{omit_regex_path}}, qq(^$o/\$);
         }
         else {
-            push @$omit_regex_elt, $o;
+            push @{$self->{omit_regex_elt}}, $o;
         }
     }
+}
 
-    # Add path elements to elt array
-    while ($self->{path} =~ m|^$current.*?(([^/]+)/?)|) {
+# Add path elements to elt array
+sub add_elements
+{
+    my $self = shift;
+    my $current = $self->{root};
+    while ($self->{path} =~ m|^\Q$current\E.*?(([^/]+)/?)|) {
         my $final = $2;
         $current .= $1;
         # Ignore elements explicitly omitted
-        next if $omit{$current} || $omit{$final};
+        next if $self->{omit_elt}->{$current} || $self->{omit_elt}->{$final};
         # Ignore elements matching omit_regex_elt patterns
-        next if grep { $final =~ m/$_/ } @$omit_regex_elt;
+        next if grep { $final =~ m/$_/ } @{$self->{omit_regex_elt}};
         # Ignore paths matching omit_regex_path patterns
-        next if grep { $current =~ m/$_/ } @$omit_regex_path;
+        next if grep { $current =~ m/$_/ } @{$self->{omit_regex_path}};
         # Otherwise add to elt array
         push @{$self->{elt}}, $current;
     }
+}
 
-    # Check the final element for indexes
+# Apply element mappings
+sub map_elements
+{
+    my $self = shift;
+    die "invalid map argument" if ref $self->{map} ne 'HASH';
+
+    $self->{elt_map} = {};
+    ELT: 
+    for my $elt (@{$self->{elt}}) {
+        for my $key (sort keys %{$self->{map}}) {
+            # Map elements must be either absolute paths or element basenames
+            my $key2 = $key;
+            if (substr($key2,0,1) eq '/') {
+                # Absolute paths must end in '/'
+                $key2 .= '/' unless substr($key2,-1) eq '/';
+            } elsif ($key2 =~ m!/!) {
+                warn "map arguments must be either absolute paths or simple path basenames - skipping $key2";
+                next;
+            }
+
+            # If the map key matches this element, record map value in elt_map
+            my $match = ($key2 =~ m!/!) ? $elt eq $key2 : $elt =~ m,/\Q$key2\E/$,;
+            if ($match) {
+                $self->{elt_map}->{$elt} = $self->{map}->{$key};
+                next ELT;
+            }
+        }
+    }
+}
+
+# Check the final element for indexes
+sub check_final_index_element
+{
+    my $self = shift;
+
     $self->{indexes} = [ $self->{indexes} ] 
         if $self->{indexes} && ! ref $self->{indexes};
     if (ref $self->{indexes} eq 'ARRAY') {
@@ -134,6 +175,31 @@ sub split
             pop @{$self->{elt}};
         }
     }
+}
+
+#
+# Split the path into elements (stored in $self->{elt} arrayref)
+#
+sub split
+{
+    my $self = shift;
+    $self->{elt} = [];
+
+    # Identify the root
+    $self->setup_root;
+
+    # Setup omit stuff
+    $self->setup_omit;
+
+    # Add path elements to elt array
+    $self->add_elements;
+
+    # Apply element mappings
+    $self->map_elements if $self->{'map'};
+
+    # Check for final index elements
+    $self->check_final_index_element;
+
 }
 
 #
@@ -186,11 +252,14 @@ sub label
 }
 
 #
-# May use full URI::Escape version in future
+# Render the elt path for URI use, and lookup in elt_map if applicable
 #
-sub uri_escape
+sub uri_elt
 {
+    my $self = shift;
     local $_ = shift;
+    $_ = $self->{elt_map}->{$_} if exists $self->{elt_map}->{$_};
+    # URI escape - should maybe use URI::Escape here instead
     s/ /%20/g;
     return $_;
 }
@@ -212,12 +281,12 @@ sub format
 
             # $self->{format} coderef
             if (ref $self->{format} eq 'CODE') {
-                $out .= $self->{format}->(uri_escape($self->{elt}->[$i]), 
+                $out .= $self->{format}->($self->uri_elt($self->{elt}->[$i]), 
                     $label, $self->{extra});
             }
             # $self->{format} sprintf pattern
             elsif ($self->{format} && ! ref $self->{format}) {
-                $out .= sprintf $self->{format}, uri_escape($self->{elt}->[$i]), 
+                $out .= sprintf $self->{format}, $self->uri_elt($self->{elt}->[$i]), 
                     $label;
             }
             # Else croak
@@ -491,7 +560,21 @@ Default: none.
 
 =item *
 
-L<map|map> - not yet implemented.
+L<map|map> - a hashref of path mappings used to transform individual
+element paths. Map key paths may be either full absolute paths, or 
+simple path basenames. Elements that match a map key path have their
+paths replaced by the map value e.g. a path of /foo/bar/bog.html
+with the following map:
+
+  map => {
+    '/' => '/home.html',
+    '/foo' => '/foo/foo.html',
+    'bar' => '/foo/bar.html',
+  },
+
+will render with paths of (non-final labels omitted for clarity):
+
+  /home.html > /foo/foo.html > /foo/bar.html > Bog
 
 =back
 
@@ -579,7 +662,7 @@ Gavin Carr <gavin@openfusion.com.au>
 
 =head1 COPYRIGHT
 
-Copyright 2002-2003, Gavin Carr. All Rights Reserved.
+Copyright 2002-2005, Gavin Carr. All Rights Reserved.
 
 This program is free software. You may copy or redistribute it under the 
 same terms as perl itself.
