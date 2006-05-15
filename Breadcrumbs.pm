@@ -7,7 +7,7 @@ use strict;
 require Exporter;
 
 use vars qw($VERSION @ISA @EXPORT @EXPORT_OK);
-$VERSION = '0.05';
+$VERSION = '0.06';
 @ISA = qw(Exporter);
 @EXPORT = ();
 @EXPORT_OK = qw(breadcrumbs);
@@ -17,7 +17,7 @@ my @ARG = qw(path roots indexes omit omit_regex map labels sep format format_las
 #
 # Initialise
 #
-sub init
+sub _init
 {
     my $self = shift;
     # Argument defaults
@@ -34,8 +34,8 @@ sub init
     # Check for invalid args
     my %ARG = map { $_ => 1 } @ARG;
     my @bad = grep { ! exists $ARG{$_} } keys %arg;
-    croak "[Breadcrumbs::init] invalid argument(s): " . join(',',@bad) if @bad;
-    croak "[Breadcrumbs::init] 'path' argument must be absolute" 
+    croak "[Breadcrumbs::_init] invalid argument(s): " . join(',',@bad) if @bad;
+    croak "[Breadcrumbs::_init] 'path' argument must be absolute" 
         if $self->{path} && substr($self->{path},0,1) ne '/';
 
     # Add arguments to $self
@@ -49,11 +49,11 @@ sub new
     my $class = shift;
     my $self = {};
     bless $self, $class;
-    return $self->init(@_);
+    return $self->_init(@_);
 }
 
 # Identify the root element
-sub setup_root
+sub _setup_root
 {
     my $self = shift;
 
@@ -71,7 +71,7 @@ sub setup_root
 }
 
 # Setup omit stuff (omit hash, omit_regex arrayrefs)
-sub setup_omit
+sub _setup_omit
 {
     my $self = shift;
 
@@ -111,7 +111,7 @@ sub setup_omit
 }
 
 # Add path elements to elt array
-sub add_elements
+sub _add_elements
 {
     my $self = shift;
     my $current = $self->{root};
@@ -130,7 +130,7 @@ sub add_elements
 }
 
 # Apply element mappings
-sub map_elements
+sub _map_elements
 {
     my $self = shift;
     die "invalid map argument" if ref $self->{map} ne 'HASH';
@@ -160,7 +160,7 @@ sub map_elements
 }
 
 # Check the final element for indexes
-sub check_final_index_element
+sub _check_final_index_element
 {
     my $self = shift;
 
@@ -180,32 +180,32 @@ sub check_final_index_element
 #
 # Split the path into elements (stored in $self->{elt} arrayref)
 #
-sub split
+sub _split
 {
     my $self = shift;
     $self->{elt} = [];
 
     # Identify the root
-    $self->setup_root;
+    $self->_setup_root;
 
     # Setup omit stuff
-    $self->setup_omit;
+    $self->_setup_omit;
 
     # Add path elements to elt array
-    $self->add_elements;
+    $self->_add_elements;
 
     # Apply element mappings
-    $self->map_elements if $self->{'map'};
+    $self->_map_elements if $self->{'map'};
 
     # Check for final index elements
-    $self->check_final_index_element;
+    $self->_check_final_index_element;
 
 }
 
 #
 # Generate a default label for $elt
 #
-sub label_default
+sub _label_default
 {
     my $self = shift;
     my ($elt, $last, $extra) = @_;
@@ -227,7 +227,7 @@ sub label_default
 #
 # Return a label for the given element
 #
-sub label
+sub _label
 {
     my $self = shift;
     my ($elt, $last, $extra) = @_;
@@ -246,7 +246,7 @@ sub label
     }
 
     # Else use defaults
-    $label ||= $self->label_default($elt, $last, $extra);
+    $label ||= $self->_label_default($elt, $last, $extra);
 
     return $label;
 }
@@ -254,7 +254,7 @@ sub label
 #
 # Render the elt path for URI use, and lookup in elt_map if applicable
 #
-sub uri_elt
+sub _uri_elt
 {
     my $self = shift;
     local $_ = shift;
@@ -267,7 +267,7 @@ sub uri_elt
 # 
 # HTML-format the breadcrumbs
 #
-sub format 
+sub _format 
 {
     my $self = shift;
 
@@ -277,16 +277,16 @@ sub format
         # Format breadcrumb links
         if ($i != $#{$self->{elt}}) {
             # Generate label
-            my $label = $self->label($self->{elt}->[$i], undef, $self->{extra});
+            my $label = $self->_label($self->{elt}->[$i], undef, $self->{extra});
 
             # $self->{format} coderef
             if (ref $self->{format} eq 'CODE') {
-                $out .= $self->{format}->($self->uri_elt($self->{elt}->[$i]), 
+                $out .= $self->{format}->($self->_uri_elt($self->{elt}->[$i]), 
                     $label, $self->{extra});
             }
             # $self->{format} sprintf pattern
             elsif ($self->{format} && ! ref $self->{format}) {
-                $out .= sprintf $self->{format}, $self->uri_elt($self->{elt}->[$i]), 
+                $out .= sprintf $self->{format}, $self->_uri_elt($self->{elt}->[$i]), 
                     $label;
             }
             # Else croak
@@ -301,7 +301,7 @@ sub format
         # Format final element breadcrumb label
         else {
             # Generate label
-            my $label = $self->label($self->{elt}->[$i], 'last', $self->{extra});
+            my $label = $self->_label($self->{elt}->[$i], 'last', $self->{extra});
 
             # $self->{format_last} coderef
             if (ref $self->{format_last} eq 'CODE') {
@@ -345,10 +345,10 @@ sub render
         if substr($self->{path},0,1) ne '/';
 
     # Split the path into elements
-    $self->split();
+    $self->_split();
 
     # Format
-    return $self->format();
+    return $self->_format();
 }
 
 # 

@@ -2,6 +2,34 @@
 # arch-tag: automatic-ChangeLog--gavin@openfusion.com.au--public-2004/cpan--breadcrumbs--0
 #
 
+2006-05-14 22:29:43 GMT	Gavin Carr <gavin@openfusion.com.au>	patch-6
+
+    Summary:
+      Add leading _ to private methods.
+    Revision:
+      cpan--breadcrumbs--0--patch-6
+
+    Add leading _ to private methods.
+    
+
+    modified files:
+     Breadcrumbs.pm ChangeLog
+
+
+2006-05-14 22:26:08 GMT	Gavin Carr <gavin@openfusion.com.au>	patch-5
+
+    Summary:
+      Fix problem with label test case.
+    Revision:
+      cpan--breadcrumbs--0--patch-5
+
+    Fix problem with label test case.
+    
+
+    modified files:
+     Breadcrumbs.pm ChangeLog t/04_labels.t t/t04/uc
+
+
 2005-10-18 05:26:00 GMT	Gavin Carr <gavin@openfusion.com.au>	patch-4
 
     Summary:

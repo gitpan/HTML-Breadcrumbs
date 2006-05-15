@@ -1,7 +1,7 @@
 # labels
 
-use Test;
-BEGIN { plan tests => 13 };
+use strict;
+use Test::More tests => 13;
 use HTML::Breadcrumbs qw(breadcrumbs);
 
 # Load result strings
@@ -20,33 +20,33 @@ for (readdir DATADIR) {
 close DATADIR;
 
 # Hashref labels
-$labels = {};
-ok(breadcrumbs(path => '/foo/bar/bog.html', labels => $labels) eq $result{bog});
+my $labels = {};
+is(breadcrumbs(path => '/foo/bar/bog.html', labels => $labels), $result{bog});
 $labels = { '/foo' => 'Foo Foo' };
-ok(breadcrumbs(path => '/foo/bar/bog.html', labels => $labels) eq $result{foo});
+is(breadcrumbs(path => '/foo/bar/bog.html', labels => $labels), $result{foo});
 $labels = { '/foo/' => 'Foo Foo' };
-ok(breadcrumbs(path => '/foo/bar/bog.html', labels => $labels) eq $result{foo});
+is(breadcrumbs(path => '/foo/bar/bog.html', labels => $labels), $result{foo});
 $labels = { 'foo' => 'Foo Foo' };
-ok(breadcrumbs(path => '/foo/bar/bog.html', labels => $labels) eq $result{foo});
+is(breadcrumbs(path => '/foo/bar/bog.html', labels => $labels), $result{foo});
 $labels = { '/bar' => 'Bar Bar' };
-ok(breadcrumbs(path => '/foo/bar/bog.html', labels => $labels) eq $result{bog});
+is(breadcrumbs(path => '/foo/bar/bog.html', labels => $labels), $result{bog});
 $labels = { '/foo/bar' => 'Bar Bar' };
-ok(breadcrumbs(path => '/foo/bar/bog.html', labels => $labels) eq $result{bar});
+is(breadcrumbs(path => '/foo/bar/bog.html', labels => $labels), $result{bar});
 $labels = { '/foo/bar/' => 'Bar Bar' };
-ok(breadcrumbs(path => '/foo/bar/bog.html', labels => $labels) eq $result{bar});
+is(breadcrumbs(path => '/foo/bar/bog.html', labels => $labels), $result{bar});
 $labels = { 'bar' => 'Bar Bar' };
-ok(breadcrumbs(path => '/foo/bar/bog.html', labels => $labels) eq $result{bar});
+is(breadcrumbs(path => '/foo/bar/bog.html', labels => $labels), $result{bar});
 $labels = { '/foo/bar/bog.html' => 'All Things Bog' };
-ok(breadcrumbs(path => '/foo/bar/bog.html', labels => $labels) eq $result{bog2});
+is(breadcrumbs(path => '/foo/bar/bog.html', labels => $labels), $result{bog2});
 $labels = { 'bog.html' => 'All Things Bog' };
-ok(breadcrumbs(path => '/foo/bar/bog.html', labels => $labels) eq $result{bog2});
+is(breadcrumbs(path => '/foo/bar/bog.html', labels => $labels), $result{bog2});
 
 # Subref labels
-ok(breadcrumbs(path => '/foo/bar/bog.html', labels => sub { } ) eq $result{bog});
-ok(breadcrumbs(path => '/foo/bar/bog.html', labels => sub { uc($_[1]) } ) eq $result{uc});
+is(breadcrumbs(path => '/foo/bar/bog.html', labels => sub { } ), $result{bog});
+is(breadcrumbs(path => '/foo/bar/bog.html', labels => sub { $_[0] eq '/' ? 'HOME' : uc($_[1]) } ), $result{uc});
 sub label1 {
   my ($fq_elt, $elt, $last) = @_;
   $elt =~ s/\.[^.]+// if $last;
   return $fq_elt eq '/' ? 'TOP' : uc($elt);
 }
-ok(breadcrumbs(path => '/foo/bar/bog.html', labels => \&label1 ) eq $result{uc2});
+is(breadcrumbs(path => '/foo/bar/bog.html', labels => \&label1 ), $result{uc2});
