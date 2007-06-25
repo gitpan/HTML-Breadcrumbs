@@ -21,9 +21,11 @@ t/t02/bar2
 t/t02/bog
 t/t02/foo
 t/t03/bar
+t/t03/bog
 t/t03/cgi
 t/t03/foo
 t/t03/foon
+t/t03/full1
 t/t03/n123
 t/t03/n678
 t/t03/n678full

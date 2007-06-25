@@ -7,7 +7,7 @@ use strict;
 require Exporter;
 
 use vars qw($VERSION @ISA @EXPORT @EXPORT_OK);
-$VERSION = '0.06';
+$VERSION = '0.7';
 @ISA = qw(Exporter);
 @EXPORT = ();
 @EXPORT_OK = qw(breadcrumbs);
@@ -86,8 +86,8 @@ sub _setup_omit
         for (@{$self->{omit}}) {
             # Omit elements should be either absolute paths or element basenames
             if (substr($_,0,1) eq '/') {
-                # Absolute paths should also end in '/'
-                $_ .= '/' unless substr($_,-1) eq '/';
+                # Remove any trailing '/'
+                $_ = substr($_, 0, -1)  if substr($_,-1) eq '/';
             } elsif (m!/!) {
                 warn "omit arguments must be either absolute paths or simple path basenames - skipping $_";
                 next;
@@ -102,7 +102,7 @@ sub _setup_omit
         if ($o =~ m!/!) {
             $o =~ s!^\^!!;
             $o =~ s!/*(\$)?$!!;  #!
-            push @{$self->{omit_regex_path}}, qq(^$o/\$);
+            push @{$self->{omit_regex_path}}, qq(^$o\$);
         }
         else {
             push @{$self->{omit_regex_elt}}, $o;
@@ -115,15 +115,18 @@ sub _add_elements
 {
     my $self = shift;
     my $current = $self->{root};
-    while ($self->{path} =~ m|^\Q$current\E.*?(([^/]+)/?)|) {
+    while ($self->{path} =~ m|^\Q$current\E/*(([^/]+)/?)|) {
         my $final = $2;
         $current .= $1;
+        # Remove any trailing '/' from current for testing
+        my $current_test = $current;
+        $current_test = substr($current_test, 0, -1) if substr($current_test, -1) eq '/';
         # Ignore elements explicitly omitted
-        next if $self->{omit_elt}->{$current} || $self->{omit_elt}->{$final};
+        next if $self->{omit_elt}->{$current_test} || $self->{omit_elt}->{$final};
         # Ignore elements matching omit_regex_elt patterns
         next if grep { $final =~ m/$_/ } @{$self->{omit_regex_elt}};
         # Ignore paths matching omit_regex_path patterns
-        next if grep { $current =~ m/$_/ } @{$self->{omit_regex_path}};
+        next if grep { $current_test =~ m/$_/ } @{$self->{omit_regex_path}};
         # Otherwise add to elt array
         push @{$self->{elt}}, $current;
     }
